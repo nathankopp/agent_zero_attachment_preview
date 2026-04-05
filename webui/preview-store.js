@@ -15,7 +15,7 @@ const TEXT_EXTS = new Set([
   "py", "js", "ts", "css", "sh", "bash", "zsh",
   "c", "cpp", "h", "java", "go", "rs", "rb",
   "php", "sql", "r", "lua", "pl", "swift", "kt",
-  "toml", "env", "gitignore", "dockerfile",
+  "toml",
 ]);
 
 const ALL_PREVIEWABLE = new Set([

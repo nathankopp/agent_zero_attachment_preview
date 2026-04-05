@@ -21,7 +21,7 @@ PREVIEWABLE_EXTENSIONS = {
     ".py", ".js", ".ts", ".css", ".sh", ".bash", ".zsh",
     ".c", ".cpp", ".h", ".java", ".go", ".rs", ".rb",
     ".php", ".sql", ".r", ".lua", ".pl", ".swift", ".kt",
-    ".toml", ".env", ".gitignore", ".dockerfile",
+    ".toml",
 }
 
 
@@ -77,7 +77,7 @@ def stream_file_inline(file_source, filename, chunk_size=8192):
     )
 
 
-class PreviewWorkDirFile(ApiHandler):
+class Preview(ApiHandler):
 
     @classmethod
     def get_methods(cls):
