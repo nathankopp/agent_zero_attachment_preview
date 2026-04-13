@@ -60,6 +60,7 @@ const model = {
     this._interceptOpenFileLink();
     this._interceptDownloadLinks();
     this._interceptAttachmentChips();
+    this._interceptFileBrowser();
   },
 
   _injectExtensionPoint() {
@@ -132,6 +133,78 @@ const model = {
   isPreviewable(filename) {
     return ALL_PREVIEWABLE.has(getExt(filename));
   },
+  _interceptFileBrowser() {
+    const self = this;
+    const observer = new MutationObserver((mutations) => {
+      const fileItems = document.querySelectorAll('.file-item:not([data-preview-injected])');
+      if (!fileItems.length) return;
+
+      fileItems.forEach(item => {
+        item.setAttribute('data-preview-injected', 'true');
+
+        // Skip directories
+        if (item.getAttribute('data-is-dir') === 'true') return;
+
+        // Get filename
+        const nameSpan = item.querySelector('.file-name span');
+        if (!nameSpan) return;
+        const fileName = nameSpan.textContent.trim();
+
+        // Check if previewable
+        if (!self.isPreviewable(fileName)) return;
+
+        // Find the download button to insert before it
+        const downloadBtn = item.querySelector('.file-actions .btn-icon-action[title="Download file"]');
+        if (!downloadBtn) return;
+
+        // Check not already injected
+        if (item.querySelector('.preview-in-browser-btn')) return;
+
+        // Create preview button
+        const btn = document.createElement('button');
+        btn.className = 'btn-icon-action preview-in-browser-btn';
+        btn.title = 'Preview file';
+        btn.innerHTML = '<span class="material-symbols-outlined">visibility</span>';
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const filePath = self._getFilePathFromBrowser(fileName) || self._buildPath(fileName);
+          if (!filePath) return;
+          window.closeModal();
+          setTimeout(() => {
+            self.open(filePath, fileName);
+          }, 100);
+        });
+
+        downloadBtn.parentNode.insertBefore(btn, downloadBtn);
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+    this._fileBrowserObserver = observer;
+  },
+
+  _getFilePathFromBrowser(fileName) {
+    try {
+      const fbStore = Alpine.store('fileBrowser');
+      if (!fbStore) return null;
+      const entry = fbStore.browser.entries.find(e => e.name === fileName);
+      return entry ? entry.path : null;
+    } catch {
+      return null;
+    }
+  },
+
+  _buildPath(fileName) {
+    try {
+      const fbStore = Alpine.store('fileBrowser');
+      const base = (fbStore.browser.currentPath || '').replace(/\/$/, '');
+      return base ? `${base}/${fileName}` : `/${fileName}`;
+    } catch {
+      return `/${fileName}`;
+    }
+  },
+
 
   async open(filePath, fileName) {
     filePath = decodeURIComponent(filePath);
