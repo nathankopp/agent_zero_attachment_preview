@@ -56,7 +56,7 @@
             <button class="btn-icon-action" @click="$store.attachmentPreview.downloadFile()" title="Download">
               <span class="material-symbols-outlined">download</span>
             </button>
-            <button class="btn-icon-action" @click="$store.attachmentPreview.toggleMaximize()" :title="$store.attachmentPreview.isMaximized ? 'Restore' : 'Maximize'">
+            <button class="btn-icon-action" x-show="!$store.attachmentPreview.fromFileBrowser" @click="$store.attachmentPreview.toggleMaximize()" :title="$store.attachmentPreview.isMaximized ? 'Restore' : 'Maximize'">
               <span class="material-symbols-outlined" x-text="$store.attachmentPreview.isMaximized ? 'close_fullscreen' : 'open_in_full'"></span>
             </button>
             <button class="btn-icon-action" @click="$store.attachmentPreview.close()" title="Close">

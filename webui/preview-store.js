@@ -57,6 +57,7 @@ const model = {
   error: /** @type {string|null} */ (null),
   isResizing: false,
   isMaximized: false,
+  fromFileBrowser: false,
   zoomLevel: 100,
 
   // Intercept openFileLink, download links, and attachment chip clicks
@@ -139,55 +140,145 @@ const model = {
   isPreviewable(filename) {
     return ALL_PREVIEWABLE.has(getExt(filename));
   },
-  _interceptFileBrowser() {
+_interceptFileBrowser() {
     const self = this;
+    const MAX_RETRIES = 10;
+
+function isInVisibleModal(item) {
+      // Only process if inside a visible modal
+      const modal = item.closest('.modal');
+      if (!modal) {
+        // Not in a modal at all - skip
+        return false;
+      }
+      // Modal is visible if it has the .show class (see modals.css)
+      // Note: can't use offsetParent because fixed elements always return null
+      return modal.classList.contains('show');
+    }
+
+function processFileItem(item, retries = 0) {
+      const debugId = item.getAttribute('data-preview-injected') || 'new';
+      console.log('[attachmentPreview] processFileItem - item:', item, 'retries:', retries, 'id:', debugId);
+
+      // Skip if not in a visible modal context - but still mark as injected
+      // so we don't keep re-processing the same hidden elements
+      const visibleModal = isInVisibleModal(item);
+      console.log('[attachmentPreview] isInVisibleModal:', visibleModal, 'modal:', item.closest('.modal'));
+      if (!visibleModal) {
+        item.setAttribute('data-preview-injected', 'true');
+        return;
+      }
+
+      if (retries >= MAX_RETRIES) {
+        // Give up – mark as injected to stop retrying
+        item.setAttribute('data-preview-injected', 'true');
+        console.warn('[attachmentPreview] gave up injecting preview button after', MAX_RETRIES, 'retries', 'item:', item);
+        return;
+      }
+
+      // Skip directories – mark immediately so we don't revisit
+      const isDir = item.getAttribute('data-is-dir') === 'true';
+      console.log('[attachmentPreview] isDir:', isDir);
+      if (isDir) {
+        item.setAttribute('data-preview-injected', 'true');
+        return;
+      }
+
+      // Get filename
+      const nameSpan = item.querySelector('.file-name span');
+      console.log('[attachmentPreview] nameSpan:', nameSpan, 'parent:', item.querySelector('.file-name'));
+      if (!nameSpan) {
+        // No span yet – retry on next frame (Alpine may not have rendered it)
+        console.log('[attachmentPreview] no nameSpan, retrying...');
+        requestAnimationFrame(() => processFileItem(item, retries + 1));
+        return;
+      }
+      const fileName = nameSpan.textContent.trim();
+      console.log('[attachmentPreview] fileName:', fileName, 'text:', nameSpan.textContent);
+
+      // If filename is empty, Alpine hasn't processed x-text yet.
+      // Retry on next frame rather than marking as injected.
+      if (!fileName) {
+        console.log('[attachmentPreview] fileName empty, retrying...');
+        requestAnimationFrame(() => processFileItem(item, retries + 1));
+        return;
+      }
+
+      // Non-previewable files – mark immediately so we don't revisit
+      const isPreviewable = self.isPreviewable(fileName);
+      console.log('[attachmentPreview] isPreviewable:', isPreviewable, 'ext:', fileName.split('.').pop());
+      if (!isPreviewable) {
+        item.setAttribute('data-preview-injected', 'true');
+        return;
+      }
+
+      // Find the download button to insert before it
+      const fileActions = item.querySelector('.file-actions');
+      const allButtons = fileActions?.querySelectorAll('.btn-icon-action');
+      console.log('[attachmentPreview] fileActions:', fileActions);
+      console.log('[attachmentPreview] allButtons count:', allButtons?.length);
+      if (allButtons) {
+        allButtons.forEach((btn, i) => {
+          const title = btn.getAttribute('title');
+          const classes = btn.className;
+          const style = btn.getAttribute('style');
+          console.log('[attachmentPreview] button', i, 'title="' + title + '"', 'class:', classes, 'style:', style, 'btn:', btn);
+        });
+      }
+      const downloadBtn = item.querySelector('.file-actions .btn-icon-action[data-bs-original-title="Download file"]');
+      console.log('[attachmentPreview] downloadBtn found:', downloadBtn);
+      if (!downloadBtn) {
+        // Actions not rendered yet – retry on next frame
+        console.log('[attachmentPreview] no downloadBtn, retrying...');
+        requestAnimationFrame(() => processFileItem(item, retries + 1));
+        return;
+      }
+
+      // Check not already injected
+      const existingBtn = item.querySelector('.preview-in-browser-btn');
+      console.log('[attachmentPreview] existingBtn:', existingBtn);
+      if (existingBtn) {
+        item.setAttribute('data-preview-injected', 'true');
+        return;
+      }
+
+      // Create preview button
+      const btn = document.createElement('button');
+      btn.className = 'btn-icon-action preview-in-browser-btn';
+      btn.title = 'Preview file';
+      btn.innerHTML = '<span class="material-symbols-outlined">visibility</span>';
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const filePath = self._getFilePathFromBrowser(fileName) || self._buildPath(fileName);
+        if (!filePath) return;
+        window.closeModal();
+        setTimeout(() => {
+          self.open(filePath, fileName, { fromFileBrowser: true });
+        }, 100);
+      });
+
+      downloadBtn.parentNode.insertBefore(btn, downloadBtn);
+
+      // Mark as processed only after successful injection
+      item.setAttribute('data-preview-injected', 'true');
+      console.debug('[attachmentPreview] injected preview button for:', fileName);
+    }
+
     const observer = new MutationObserver((mutations) => {
       const fileItems = document.querySelectorAll('.file-item:not([data-preview-injected])');
       if (!fileItems.length) return;
 
       fileItems.forEach(item => {
-        item.setAttribute('data-preview-injected', 'true');
-
-        // Skip directories
-        if (item.getAttribute('data-is-dir') === 'true') return;
-
-        // Get filename
-        const nameSpan = item.querySelector('.file-name span');
-        if (!nameSpan) return;
-        const fileName = nameSpan.textContent.trim();
-
-        // Check if previewable
-        if (!self.isPreviewable(fileName)) return;
-
-        // Find the download button to insert before it
-        const downloadBtn = item.querySelector('.file-actions .btn-icon-action[title="Download file"]');
-        if (!downloadBtn) return;
-
-        // Check not already injected
-        if (item.querySelector('.preview-in-browser-btn')) return;
-
-        // Create preview button
-        const btn = document.createElement('button');
-        btn.className = 'btn-icon-action preview-in-browser-btn';
-        btn.title = 'Preview file';
-        btn.innerHTML = '<span class="material-symbols-outlined">visibility</span>';
-
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const filePath = self._getFilePathFromBrowser(fileName) || self._buildPath(fileName);
-          if (!filePath) return;
-          window.closeModal();
-          setTimeout(() => {
-            self.open(filePath, fileName);
-          }, 100);
-        });
-
-        downloadBtn.parentNode.insertBefore(btn, downloadBtn);
+        // Try processing immediately; if not in visible modal or Alpine hasn't rendered yet,
+        // processFileItem will skip or schedule a requestAnimationFrame retry
+        processFileItem(item);
       });
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
     this._fileBrowserObserver = observer;
+    console.debug('[attachmentPreview] file browser interceptor started');
   },
 
   _getFilePathFromBrowser(fileName) {
@@ -212,7 +303,7 @@ const model = {
   },
 
 
-  async open(filePath, fileName) {
+  async open(filePath, fileName, options = {}) {
     filePath = decodeURIComponent(filePath);
     const ext = getExt(fileName || filePath);
     const type = detectType(ext);
@@ -226,6 +317,8 @@ const model = {
     this.error = null;
     this.isLoading = true;
     this.isOpen = true;
+    this.fromFileBrowser = !!options.fromFileBrowser;
+    this.isMaximized = !!options.fromFileBrowser;
 
     try {
       switch (type) {
@@ -275,6 +368,7 @@ const model = {
   close() {
     this.isOpen = false;
     this.isMaximized = false;
+    this.fromFileBrowser = false;
     this.filePath = "";
     this.fileName = "";
     this.fileExt = "";
