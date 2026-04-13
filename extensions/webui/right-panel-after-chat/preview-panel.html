@@ -164,15 +164,25 @@
 
 #preview-panel.maximized {
   position: fixed;
-  top: 10%;
-  left: 10%;
-  width: 80%;
-  height: 80% !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
   min-height: 0;
   z-index: 2000;
   border-top: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 23px rgba(0, 0, 0, 0.2);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#preview-panel.maximized .preview-body {
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#preview-panel.maximized ~ .preview-maximized-backdrop.active {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .preview-resize-handle {
@@ -378,6 +388,11 @@
   }
   .preview-resize-handle {
     display: none;
+  }
+  #preview-panel.maximized .preview-body {
+    max-width: none;
+    padding-left: var(--spacing-xs);
+    padding-right: var(--spacing-xs);
   }
 }
 /* Preview button injected into file browser */
