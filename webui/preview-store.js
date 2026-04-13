@@ -345,7 +345,6 @@ const model = {
       panel.style.height = "";
       this.isMaximized = true;
     }
-    }
   },
 
   // Load saved zoom level from localStorage
