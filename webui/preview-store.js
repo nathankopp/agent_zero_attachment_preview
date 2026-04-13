@@ -196,7 +196,7 @@ const model = {
       if (!fbStore) return null;
       const entry = fbStore.browser.entries.find(e => e.name === fileName);
       return entry ? entry.path : null;
-    } catch {
+    } catch (e) {
       return null;
     }
   },
@@ -206,7 +206,7 @@ const model = {
       const fbStore = Alpine.store('fileBrowser');
       const base = (fbStore.browser.currentPath || '').replace(/\/$/, '');
       return base ? `${base}/${fileName}` : `/${fileName}`;
-    } catch {
+    } catch (e) {
       return `/${fileName}`;
     }
   },
@@ -359,7 +359,7 @@ const model = {
           return;
         }
       }
-    } catch { /* localStorage unavailable */ }
+    } catch (e) { /* localStorage unavailable */ }
     this.zoomLevel = ZOOM_DEFAULT;
   },
 
@@ -391,7 +391,7 @@ const model = {
   _saveZoom() {
     try {
       localStorage.setItem(ZOOM_STORAGE_KEY, String(this.zoomLevel));
-    } catch { /* localStorage unavailable */ }
+    } catch (e) { /* localStorage unavailable */ }
   },
 };
 
