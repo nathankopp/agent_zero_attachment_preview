@@ -12,7 +12,8 @@
 
         <div id="preview-panel"
              :class="{ 'open': $store.attachmentPreview.isOpen, 'maximized': $store.attachmentPreview.isMaximized }"
-             x-show="$store.attachmentPreview.isOpen">
+             x-show="$store.attachmentPreview.isOpen"
+             x-effect="$store.attachmentPreview && document.getElementById('preview-panel')?.style.setProperty('--preview-zoom', $store.attachmentPreview.zoomLevel / 100)">
 
         <!-- Resize -->
         <div class="preview-resize-handle"
@@ -27,6 +28,31 @@
             <span class="preview-header-name" x-text="$store.attachmentPreview.fileName" :title="$store.attachmentPreview.filePath"></span>
           </div>
           <div class="preview-header-actions">
+            <!-- Zoom controls -->
+            <div class="preview-zoom-controls" x-show="$store.attachmentPreview.isOpen">
+              <button class="btn-icon-action preview-zoom-btn"
+                      @click="$store.attachmentPreview.zoomOut()"
+                      :disabled="$store.attachmentPreview.zoomLevel <= 50"
+                      title="Zoom out">
+                <span class="material-symbols-outlined">zoom_out</span>
+              </button>
+              <button class="btn-icon-action preview-zoom-level"
+                      @click="$store.attachmentPreview.zoomReset()"
+                      :title="'Reset zoom (' + $store.attachmentPreview.zoomLevel + '%)'">
+                <span x-text="$store.attachmentPreview.zoomLevel + '%'" class="preview-zoom-label"></span>
+              </button>
+              <button class="btn-icon-action preview-zoom-btn"
+                      @click="$store.attachmentPreview.zoomIn()"
+                      :disabled="$store.attachmentPreview.zoomLevel >= 200"
+                      title="Zoom in">
+                <span class="material-symbols-outlined">zoom_in</span>
+              </button>
+            </div>
+
+            <!-- Separator -->
+            <div class="preview-header-separator" x-show="$store.attachmentPreview.isOpen"></div>
+
+            <!-- Existing actions -->
             <button class="btn-icon-action" @click="$store.attachmentPreview.downloadFile()" title="Download">
               <span class="material-symbols-outlined">download</span>
             </button>
@@ -249,11 +275,57 @@
   padding: var(--spacing-xxs);
 }
 
+/* Zoom controls */
+.preview-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.preview-zoom-btn {
+  color: var(--color-text-muted);
+  transition: color 0.15s ease;
+}
+.preview-zoom-btn:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+.preview-zoom-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.preview-zoom-level {
+  cursor: pointer;
+  min-width: 38px;
+  text-align: center;
+  padding: 0 2px !important;
+}
+.preview-zoom-level:hover {
+  color: var(--color-primary);
+}
+
+.preview-zoom-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.preview-header-separator {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .preview-body {
   flex: 1;
   overflow: auto;
   min-height: 0;
   position: relative;
+  zoom: var(--preview-zoom, 1);
 }
 
 .preview-status {
@@ -393,6 +465,11 @@
     max-width: none;
     padding-left: var(--spacing-xs);
     padding-right: var(--spacing-xs);
+  }
+  /* Slightly larger touch targets for zoom controls on mobile */
+  .preview-zoom-btn,
+  .preview-zoom-level {
+    padding: var(--spacing-xs) !important;
   }
 }
 /* Preview button injected into file browser */

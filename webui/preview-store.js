@@ -23,6 +23,10 @@ const ALL_PREVIEWABLE = new Set([
   ...MARKDOWN_EXTS, ...HTML_EXTS, ...TEXT_EXTS,
 ]);
 
+const ZOOM_STEPS = [50, 75, 90, 100, 110, 125, 150, 200];
+const ZOOM_DEFAULT = 100;
+const ZOOM_STORAGE_KEY = "previewZoomLevel";
+
 function getExt(filename) {
   const dot = filename.lastIndexOf(".");
   return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
@@ -53,6 +57,7 @@ const model = {
   error: /** @type {string|null} */ (null),
   isResizing: false,
   isMaximized: false,
+  zoomLevel: 100,
 
   // Intercept openFileLink, download links, and attachment chip clicks
   init() {
@@ -61,6 +66,7 @@ const model = {
     this._interceptDownloadLinks();
     this._interceptAttachmentChips();
     this._interceptFileBrowser();
+    this._initZoom();
   },
 
   _injectExtensionPoint() {
@@ -339,6 +345,53 @@ const model = {
       panel.style.height = "";
       this.isMaximized = true;
     }
+    }
+  },
+
+  // Load saved zoom level from localStorage
+  _initZoom() {
+    try {
+      const stored = localStorage.getItem(ZOOM_STORAGE_KEY);
+      if (stored !== null) {
+        const parsed = parseInt(stored, 10);
+        if (ZOOM_STEPS.includes(parsed)) {
+          this.zoomLevel = parsed;
+          return;
+        }
+      }
+    } catch { /* localStorage unavailable */ }
+    this.zoomLevel = ZOOM_DEFAULT;
+  },
+
+  // Zoom in to next step
+  zoomIn() {
+    const idx = ZOOM_STEPS.indexOf(this.zoomLevel);
+    if (idx < ZOOM_STEPS.length - 1) {
+      this.zoomLevel = ZOOM_STEPS[idx + 1];
+      this._saveZoom();
+    }
+  },
+
+  // Zoom out to previous step
+  zoomOut() {
+    const idx = ZOOM_STEPS.indexOf(this.zoomLevel);
+    if (idx > 0) {
+      this.zoomLevel = ZOOM_STEPS[idx - 1];
+      this._saveZoom();
+    }
+  },
+
+  // Reset zoom to default
+  zoomReset() {
+    this.zoomLevel = ZOOM_DEFAULT;
+    this._saveZoom();
+  },
+
+  // Persist current zoom level
+  _saveZoom() {
+    try {
+      localStorage.setItem(ZOOM_STORAGE_KEY, String(this.zoomLevel));
+    } catch { /* localStorage unavailable */ }
   },
 };
 
